@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        "use strict";
+    
+        var canvas;
+        var ctx;
+        //our websocket connection
+        var socket; 
+
+        // Our square object to draw to the screen
+        // This holds all of the parameters of our square and will
+        // be synced from the server. When server updates come in
+        // we will update this object
+        var square = {
+            //last time this was updated so that we don't override it with a later time
+            //We would have to add logic to this code to not update if the new square packet is
+            //older than our last received one
+            lastUpdate: new Date().getTime(),
+            x: 0, //x position of our square
+            y: 0, //y position of our square
+            height: 100, //height of our square
+            width: 100 //width of our square
+        };
+        
+    
+        
+        //redraw our square to the screen
+        function redraw(keys, draws) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+			
+            //draw our updated square
+			for(var i = 0; i < keys.length; i++)
+			{
+				var drawCall = draws[ keys[i] ];
+				ctx.fillStyle = drawCall.color;
+				ctx.fillRect(drawCall.x, drawCall.y, drawCall.width, drawCall.height);
+			}
+        }
+        
+
+        function init() {
+            canvas = document.querySelector("#canvas");
+            ctx = canvas.getContext("2d");
+			var x;
+			var y;
+			var draws = {};
+			
+			
+			//Imagine an object inside of draws to look like {x: 10, y: 10, width: 10, height: 10}
+			function draw()
+			{
+				var keys = Object.keys(draws);
+				
+				//Call redraw to clear the canvas and redraw the square in the right order
+				redraw(keys, draws);
+			}
+			
+			//SetCall function
+			function setCalls()
+			{
+				var time = new Date().getTime();
+
+				//draws[time] = {x: x, y: y, width: 100, height: 100, color: "black"};
+
+				//time = new Date().getTime();
+
+				var coords = {x: x - 50, y: y - 50, width:100, height:100, color: "black"};
+				
+				socket.emit('draw', {time: time, coords: coords});
+
+			}
+			
+			//HandleMessage function
+			function handleMessage(data)
+			{
+				draws[data.time] = data.coords;
+				draw();
+			}
+			
+			//Get mouse position
+			canvas.addEventListener('click', function(evt) {
+				var mousePos = getMousePos(canvas, evt);
+				x = mousePos.x;
+				y = mousePos.y;
+				console.log("x: " + x + "  y:" + y);
+				
+				setCalls();
+				
+			}, false);
+			
+			function getMousePos(canvas, evt) {
+				var rect = canvas.getBoundingClientRect();
+				return {
+				  x: evt.clientX - rect.left,
+				  y: evt.clientY - rect.top
+				};
+			}
+
+        
+            //Connect to our server (io added automatically by socket.io when embedding it in the HTTP app on the server side)
+            //This will return a new websocket connection. Every call to io.connect will return a new websocket connection 
+            //BUT not necessarily close the existing one. 
+            //You can absolutely use multiple websockets on the client, but you have to manage which ones are listening to which
+            //messages. In cases like this, you only need one. 
+            socket = io.connect();
+            
+            //When the socket connects successfully
+            socket.on('connect', function () {
+                
+				
+            });      
+            
+            //When our socket receives 'drawSquare' messages from the server, call our handleMessage function
+			socket.on('drawSquare',handleMessage);
+        }
+
+      window.onload = init;
+    </script>
+</head>
+<body>
+    <canvas id="canvas" height="500" width="500" style= "border:1px solid black">Please use an HTML 5 browser</canvas>
+</body>
+</html>
